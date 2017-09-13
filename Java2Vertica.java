@@ -1,12 +1,12 @@
 import java.sql.*;
 import java.util.Properties;
 import java.util.*;
+import java.io.*;
 
 public class Java2Vertica {
 public static void main(String[] args) {
         Connection conn;
-        try {
-                
+        try {                
                 Properties connection_info = new Properties();
                 connection_info.put("user", "vertica");
                 connection_info.put("password", "12512Marlive");
@@ -18,24 +18,25 @@ public static void main(String[] args) {
                 
                 // Retrieving the number of source nodes in the graph
                 String dataset = "webgoogle";
-                String statemetStr = "SELECT COUNT(DISTINCT i) FROM " + dataset;
+                String statemetStr = "SELECT DISTINCT i FROM " + dataset;
                 ResultSet rs = stmt.executeQuery(statemetStr);
-                int max_Node_in_Graph = 0;
+                // int max_Node_in_Graph = 0;
+                ArrayList<Integer> list_of_random_source = new ArrayList<Integer>();
                 while(rs.next()) {
-                        max_Node_in_Graph = Integer.parseInt(rs.getString(1).trim());                
+                        list_of_random_source.add(Integer.parseInt(rs.getString(1).trim()));                
                 }
-                
+                // System.out.println("Done getting i out");
                 // Now getting n source nodes out
-                int num_of_sample_node = 1000;
+                int num_of_sample_node = 500;
                 Random rand = new Random();
                 Integer new_source_node;
-                ArrayList<Integer> list_of_random_source = new ArrayList<Integer>();
+                
                 do {
-                        new_source_node = rand.nextInt(max_Node_in_Graph);
-                        if (!list_of_random_source.contains(new_source_node)) 
-                                list_of_random_source.add(new_source_node);
-                } while (list_of_random_source.size() < num_of_sample_node);
-               
+                        // new_source_node = rand.nextInt(list_of_random_source.size());
+                        list_of_random_source.remove(rand.nextInt(list_of_random_source.size()));
+                        // System.out.println(list_of_random_source.size());
+                } while (list_of_random_source.size() > num_of_sample_node);
+                System.out.println(list_of_random_source.size());
 
                 // Start populating the sample table
                 statemetStr = "DROP TABLE IF EXISTS small_" + dataset;
@@ -49,7 +50,40 @@ public static void main(String[] args) {
                                         " SELECT * FROM " + dataset + " WHERE i = " + new_source_node;
                         stmt.execute(statemetStr);
                 }
+                // int num_of_source = 0;
+                // int num_of_dest = 0;
+                // do {
+                //         statemetStr = "DELETE FROM small_" + dataset + 
+                //                         " WHERE j NOT IN (SELECT i FROM small_" + dataset + ")";
+                //         stmt.execute(statemetStr);
+                //         statemetStr = "SELECT COUNT(DISTINCT i), COUNT(DISTINCT j) FROM small_" + dataset;
+                //         rs = stmt.executeQuery(statemetStr);
+                        
+                //         while (rs.next()) {
+                //                 num_of_source = Integer.parseInt(rs.getString(1).trim());
+                //                 num_of_dest = Integer.parseInt(rs.getString(2).trim());
+                //         }
+                // } while (num_of_source < num_of_dest);
 
+                statemetStr = "SELECT i, j FROM small_" + dataset;
+                rs = stmt.executeQuery(statemetStr);
+                int source_node = 0;
+                int dest_node = 0;
+                int edge_cost = 1;
+                try {
+                        PrintWriter pw = new PrintWriter("webgoogle_sample.csv", "UTF-8");
+                        while (rs.next()) {
+                                source_node = Integer.parseInt(rs.getString(1).trim());
+                                pw.print(Integer.toString(source_node) + ',');                        
+                                dest_node = Integer.parseInt(rs.getString(2).trim());
+                                pw.print(Integer.toString(dest_node) + ',');
+                                pw.println(Integer.toString(rand.nextInt(10) + 1));
+                        }
+                        pw.close();
+                } catch (IOException e) {
+                        System.out.println("Problem when opening the file." + e);
+                }
+                
                 conn.close();
         } catch (SQLTransientConnectionException connException) {
                 System.out.print("Network connection issue: ");
